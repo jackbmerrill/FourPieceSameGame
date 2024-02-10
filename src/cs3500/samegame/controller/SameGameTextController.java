@@ -20,7 +20,6 @@ public class SameGameTextController<T> implements SameGameController<T> {
   private final Readable input;
   private final Appendable output;
   private Scanner scan;
-  private boolean quit;
 
   /**
    * A constructor for the SameGameTextController. Takes in an Appendable
@@ -75,14 +74,13 @@ public class SameGameTextController<T> implements SameGameController<T> {
 
   /**
    * Runs the game. Creates a new view using the model and appendable. Using a switch statement,
-   * delegates commands to helpers. If a quit message is ever entered, it quits the game,
-   * else if the game ends, it returns a game over screen.
+   * delegates commands to helpers. If a quit message is ever entered, it catches a runtime
+   * exception and quits the game, else if the game ends, it returns a game over screen.
    *
    * @throws IllegalStateException if readable or appendable fails
    */
   private void control() throws IllegalStateException {
     scan = new Scanner(input);
-    quit = false;
     SameGameTextView<T> view = new SameGameTextView<T>(this.model, this.output);
     if (model.gameOver()) {
       writeMessage("Game over.");
@@ -90,34 +88,34 @@ public class SameGameTextController<T> implements SameGameController<T> {
       return;
     }
     gameState(view);
-    while (!quit && scan.hasNext()) {
-      String userInput = scan.next();
-      switch (userInput) {
-        case "q":
-        case "Q":
-          quit = true;
-          break;
-        case "m":
-          match();
-          break;
-        case "s":
-          swap();
-          break;
-        default:
-          writeMessage("Invalid command. Try again. Valid commands are Q, q, s, m.");
-      }
-      if (model.gameOver()) {
-        writeMessage("Game over.");
+    try {
+      while (scan.hasNext()) {
+        String userInput = scan.next();
+        switch (userInput) {
+          case "q":
+          case "Q":
+            throw new RuntimeException("Game quit.");
+          case "m":
+            match();
+            break;
+          case "s":
+            swap();
+            break;
+          default:
+            writeMessage("Invalid command. Try again. Valid commands are Q, q, s, m.");
+        }
+        if (model.gameOver()) {
+          writeMessage("Game over.");
+          gameState(view);
+          return;
+        }
         gameState(view);
-        return;
       }
-      if (quit) {
-        writeMessage("Game quit!");
-        writeMessage("State of game when quit:");
-        gameState(view);
-        return;
-      }
+    } catch (RuntimeException e) {
+      writeMessage("Game quit!");
+      writeMessage("State of game when quit:");
       gameState(view);
+      return;
     }
     throw new IllegalStateException("Readable has failed.");
   }
@@ -129,23 +127,11 @@ public class SameGameTextController<T> implements SameGameController<T> {
    *
    * @throws IllegalStateException if readable or appendable fails
    */
-  private void swap() {
+  private void swap() throws RuntimeException{
     int row1 = checkInput();
-    if (quit) {
-      return;
-    }
     int col1 = checkInput();
-    if (quit) {
-      return;
-    }
     int row2 = checkInput();
-    if (quit) {
-      return;
-    }
     int col2 = checkInput();
-    if (quit) {
-      return;
-    }
     try {
       model.swap(row1, col1, row2, col2);
     } catch (IllegalStateException e) {
@@ -162,15 +148,9 @@ public class SameGameTextController<T> implements SameGameController<T> {
    *
    * @throws IllegalStateException if readable or appendable fails
    */
-  private void match() {
+  private void match() throws RuntimeException {
     int row = checkInput();
-    if (quit) {
-      return;
-    }
     int col = checkInput();
-    if (quit) {
-      return;
-    }
     try {
       model.removeMatch(row, col);
     } catch (IllegalStateException e) {
@@ -207,19 +187,19 @@ public class SameGameTextController<T> implements SameGameController<T> {
 
   /**
    * Checks the given input. If the input is a valid integer, it returns the integer.
-   * If it is a "q" or "Q" to quit the game it returns a 0 and sets quit to true.
+   * If it is a "q" or "Q" to quit the game it throws a runtime error to be caught further.
    * If it is not a valid integer or a message to quit, the method will recurse.
    * Negatives will cause the method to recurse.
    *
    * @return A valid integer or 0.
    * @throws IllegalStateException if there is nothing else to be read.
+   * @throws RuntimeException if the game is quit.
    */
-  private int checkInput() throws IllegalStateException {
+  private int checkInput() throws IllegalStateException, RuntimeException {
     try {
       String desired = scan.next();
       if (desired.equals("Q") || desired.equals("q")) {
-        quit = true;
-        return 0;
+        throw new RuntimeException("Game quit.");
       }
       int num = Integer.parseInt(desired);
       if (num < 0) {
